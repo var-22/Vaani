@@ -9,6 +9,9 @@ within roughly 1–2 seconds, and Gemma 4 simultaneously extracts structured
 clinical signal — symptoms, duration, severity, and emergency risk — so nothing
 important gets lost to a language barrier.
 
+
+## Demo Video
+C:\Users\varsh\Downloads\Video Project.mp4
  
 
 ---
