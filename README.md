@@ -325,11 +325,6 @@ code problem:
   10+ Indian languages (Hindi, Bengali, Kannada, Malayalam, Marathi,
   Gujarati, Punjabi, Odia, and more) beyond the three wired up here, so the
   STT/TTS leg is ready today.
-- For languages where Gemma 4's zero-shot translation quality is weaker
-  (typically lower-resource languages), add a confidence/fallback tier:
-  cross-check against Sarvam's own native `mode="translate"` output, and
-  route to whichever is more consistent, rather than trusting a single model
-  blindly for every language equally.
 - The `extract_symptoms`/`detect_emergency` tool-calling contract is
   language-agnostic by design (it operates on the already-translated English
   text), so the clinical-reasoning layer doesn't need to be duplicated per
