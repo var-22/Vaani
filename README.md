@@ -208,6 +208,16 @@ translated reply.
   track is played back; the room never exposes one party's raw mic audio to
   the other untranslated.
 
+## ⚠️ Medical Disclaimer
+
+MedVoice is an assistive communication and clinical information extraction
+system designed to reduce language barriers during doctor–patient
+consultations.
+
+It does not provide medical diagnosis, prescribe treatments, or replace
+professional medical judgement. Emergency cases should always be handled by
+qualified healthcare professionals.
+
 ## 6. Tech Stack
 
 | Layer | Technology |
