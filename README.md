@@ -144,11 +144,11 @@ needs:
 
 ## 4. How It Works
 
-```
+
 
 ![MedVoice Architecture Workflow](https://github.com/user-attachments/assets/dd9005ff-c07f-4adc-88c4-07557a1c5a18)
 
-```
+
 
 
 
