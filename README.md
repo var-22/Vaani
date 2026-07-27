@@ -147,7 +147,7 @@ needs:
 <img width="1024" height="559" alt="image" src="https://github.com/user-attachments/assets/dd9005ff-c07f-4adc-88c4-07557a1c5a18" />
 
 
-```
+
 
 ## Everything is **streamed**, not batched: speech-to-text starts transcribing
 while the person is still talking (not after they finish), Gemma's
