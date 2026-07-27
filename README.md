@@ -146,7 +146,7 @@ needs:
 
 ```
 
-<img width="1024" height="559" alt="image" src="https://github.com/user-attachments/assets/dd9005ff-c07f-4adc-88c4-
+![MedVoice Architecture Workflow](https://github.com/user-attachments/assets/dd9005ff-c07f-4adc-88c4-07557a1c5a18)
 
 ```
 
