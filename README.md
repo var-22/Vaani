@@ -9,6 +9,29 @@ within roughly 1–2 seconds, and Gemma 4 simultaneously extracts structured
 clinical signal — symptoms, duration, severity, and emergency risk — so nothing
 important gets lost to a language barrier.
 
+## 🏆 Hackathon Track
+
+**Selected Track:** Track 1 — "Vaani" — Voice-First Translation for Bharat
+
+**Domain:** Healthcare
+
+MedVoice is a voice-first medical interpretation system that helps doctors and
+patients communicate across regional language barriers. The system provides
+real-time speech-to-speech translation using Gemma 4 as the core language
+understanding and generation model.
+
+### Implementation Roadmap
+
+**Stage 1 — Core Proof**
+- Tamil ↔ English real-time doctor-patient voice translation
+
+**Stage 2 — Range**
+- Telugu ↔ English support extension
+
+**Stage 3 — Vision**
+- Scaling to 10+ Indian languages using modular ASR, translation, and TTS
+pipelines.
+
 
 ## 🎥 Demo Video
 
