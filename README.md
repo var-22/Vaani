@@ -53,9 +53,7 @@ interpretation of symptoms, incorrect medical guidance, delays in treatment,
 and reduced quality of healthcare.
 
 To overcome this challenge, an AI-powered real-time voice translation system
-is proposed. The system acts as a virtual medical interpreter that translates
-doctor-patient conversations instantly between different languages while
-maintaining medical accuracy. It helps doctors and patients communicate
+is proposed. The system acts as a virtual medical interpreter that translates doctor-patient conversations instantly between different languages while preserving the meaning of medical communication. It helps doctors and patients communicate
 effectively, improves healthcare accessibility, and enables better medical
 support regardless of language differences.
 
