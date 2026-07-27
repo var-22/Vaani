@@ -10,9 +10,9 @@ clinical signal — symptoms, duration, severity, and emergency risk — so noth
 important gets lost to a language barrier.
 
 
-## Demo Video
-C:\Users\varsh\Downloads\Video Project.mp4
- 
+## 🎥 Demo Video
+
+[▶️ Watch MedVoice Demo Video](https://drive.google.com/file/d/1OnBXChKZxUioGwGQ9ZDlQfJ8MDrX72Bv/view?usp=sharing)
 
 ---
 
