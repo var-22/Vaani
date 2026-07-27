@@ -1,0 +1,304 @@
+/* ==========================================================================
+   MedVoice — shared design tokens
+   Palette: clinical-calm teal, warm paper, functional clay-red reserved
+   ONLY for emergency state (never decorative).
+   Type: Fraunces (display, used sparingly) + Inter (UI/body) +
+         IBM Plex Mono (timestamps / data on the doctor side).
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root {
+  --ink: #10241F;
+  --paper: #F2F4F2;
+  --paper-raised: #FFFFFF;
+  --teal-deep: #0B3D3A;
+  --teal-mid: #2E7D6B;
+  --teal-soft: #DCEAE5;
+  --gold: #C99A3C;
+  --clay: #C1442E;      /* emergency ONLY */
+  --clay-soft: #FBE4DE;
+  --line: #D8DED9;
+
+  /* Doctor-card accent for the two-role kiosk layout — additive, distinct
+     from --clay (still reserved for emergency only). */
+  --blue-deep: #1F3A5F;
+  --blue-mid: #3E6FA8;
+  --blue-soft: #DCE7F5;
+
+  --font-display: 'Fraunces', serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  --radius: 18px;
+  --radius-sm: 10px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--teal-mid);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--teal-soft);
+  color: var(--teal-deep);
+}
+.chip.gold { background: #F6EAD1; color: #8A6417; }
+.chip.clay { background: var(--clay-soft); color: var(--clay); }
+
+/* ---- Call timer (mono, used by both patient + doctor pages) ---- */
+.call-timer {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #7A8A84;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Connection status pill ---- */
+.conn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #5B6B65;
+}
+.conn-pill .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #B7C2BD;
+  transition: background 0.2s ease;
+}
+.conn-pill.connected .dot { background: var(--teal-mid); box-shadow: 0 0 0 3px var(--teal-soft); }
+.conn-pill.error .dot { background: var(--clay); box-shadow: 0 0 0 3px var(--clay-soft); }
+
+/* ---- Live audio-level waveform (driven by a Web Audio AnalyserNode) ---- */
+.waveform {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 28px;
+}
+.waveform .bar {
+  width: 3px;
+  min-height: 4px;
+  border-radius: 2px;
+  background: var(--teal-mid);
+  transition: height 0.08s ease-out;
+}
+
+/* ---- Nav link between voice-call and chat modes ---- */
+.mode-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--teal-deep);
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--paper-raised);
+  white-space: nowrap;
+}
+.mode-link:hover { background: var(--teal-soft); }
+
+/* ---- Call-interface avatars: two circles, active speaker highlighted ---- */
+.avatar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.avatar-circle {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--teal-mid), var(--teal-deep));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 30px;
+  box-shadow: 0 6px 18px rgba(11, 61, 58, 0.2);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.avatar-circle.muted-self { background: linear-gradient(160deg, #9AA6A1, #6E7A75); }
+.avatar.speaking .avatar-circle {
+  box-shadow: 0 0 0 5px var(--teal-soft), 0 0 0 9px rgba(46, 125, 107, 0.25), 0 6px 18px rgba(11, 61, 58, 0.25);
+  transform: scale(1.05);
+}
+.avatar-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--teal-deep);
+  opacity: 0.6;
+}
+.avatar.speaking .avatar-label { opacity: 1; }
+
+/* ---- Bottom control bar (mute, speaker, volume, end call, language) ---- */
+.control-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.control-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--paper-raised);
+  color: var(--teal-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.control-btn svg { width: 22px; height: 22px; fill: currentColor; }
+.control-btn:active { transform: scale(0.94); }
+.control-btn.off { background: #E9ECEA; color: #7A8A84; }
+.control-btn.end-call { background: var(--clay); color: white; border-color: var(--clay); }
+.control-btn.end-call:hover { background: #a83a26; }
+
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.volume-control input[type="range"] {
+  width: 90px;
+  accent-color: var(--teal-mid);
+}
+
+/* ==========================================================================
+   Call state machine — idle / listening / processing / speaking / error.
+   Driven by agent.py's "call-status" data-channel events (see agent.py's
+   _publish_call_status), not decorative loops: each state below is applied
+   as a `.state-*` class on `.call-screen` for as long as that pipeline
+   stage is actually happening.
+   ========================================================================== */
+.call-screen { transition: background 0.3s ease; }
+
+.call-screen.state-error { animation: state-error-shake 0.4s ease; }
+@keyframes state-error-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+.call-screen.state-error .status-line { color: var(--clay); }
+.call-screen.state-error .orb-core { background: linear-gradient(160deg, var(--clay), #A83A26) !important; }
+
+.call-screen.state-processing .orb-core {
+  animation: orb-processing-spin 1.4s linear infinite;
+  background: conic-gradient(from 0deg, var(--teal-mid), var(--gold), var(--teal-deep), var(--teal-mid));
+}
+@keyframes orb-processing-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.call-screen.state-processing .orb-core svg {
+  animation: orb-processing-counter-spin 1.4s linear infinite;
+}
+@keyframes orb-processing-counter-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+
+.call-screen.state-speaking .orb-core {
+  animation: orb-speaking-pulse 1s ease-in-out infinite;
+}
+@keyframes orb-speaking-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 8px 28px rgba(11,61,58,0.28), 0 0 0 0 rgba(46,125,107,0.4); }
+  50% { transform: scale(1.06); box-shadow: 0 8px 28px rgba(11,61,58,0.28), 0 0 0 14px rgba(46,125,107,0); }
+}
+
+.call-screen.state-idle .orb-core { opacity: 0.85; }
+
+/* ---- Turn highlight on avatars, driven by call-status "direction" ---- */
+.avatar.active-turn .avatar-circle {
+  box-shadow: 0 0 0 5px var(--teal-soft), 0 0 0 9px rgba(46, 125, 107, 0.25), 0 6px 18px rgba(11, 61, 58, 0.25);
+  transform: scale(1.05);
+}
+.avatar.active-turn .avatar-label { opacity: 1; }
+
+/* ---- Language-picker overlay, opened from the top-bar chip or the
+   control-bar language button on both call screens ---- */
+.lang-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 36, 31, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+.lang-picker-overlay.show { display: flex; }
+.lang-picker-panel {
+  background: var(--paper-raised);
+  border-radius: var(--radius);
+  padding: 24px;
+  width: min(320px, 88vw);
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+}
+.lang-picker-panel h2 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: var(--teal-deep);
+  margin: 0 0 16px;
+}
+.lang-picker-panel .lang-toggle { justify-content: center; width: 100%; }
+.lang-picker-panel .lang-toggle button { flex: 1; }
+.lang-picker-close {
+  margin-top: 16px;
+  background: none;
+  border: none;
+  color: #7A8A84;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.lang-pill {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--teal-deep);
+  background: var(--teal-soft);
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: none;
+}
+

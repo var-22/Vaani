@@ -1,0 +1,385 @@
+/* ==========================================================================
+   MedVoice Chat — a DELIBERATE second theme, scoped to chat mode only.
+   Do not @import shared.css here or reuse its teal tokens — the voice-call
+   pages (patient.html / doctor.html) keep their "clinical calm" teal look;
+   this file is the white/blue "hospital chat" look for chat-patient.html /
+   chat-doctor.html, per an explicit user request to differentiate the two
+   modes visually.
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root {
+  --blue-primary: #1a56db;
+  --blue-deep: #0f3f9e;
+  --blue-pale: #eef4ff;
+  --blue-line: #dbe4f3;
+  --surface: #ffffff;
+  --surface-sunken: #f5f8fd;
+  --ink: #17233d;
+  --ink-soft: #5b6b85;
+  --line: #dbe4f3;
+  --danger: #c1442e;
+  --danger-soft: #fbe4de;
+  --gold: #c99a3c;
+  --gold-soft: #f6ead1;
+
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+
+  --radius: 18px;
+  --radius-sm: 10px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--surface-sunken);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+button:focus-visible, a:focus-visible, select:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--blue-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ---- App shell ---- */
+.chat-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.chat-header .brand {
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--blue-deep);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chat-header .brand .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--blue-primary);
+}
+.chat-header .header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mode-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue-primary);
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--blue-line);
+  background: var(--blue-pale);
+  white-space: nowrap;
+}
+.mode-link:hover { background: #e2ecff; }
+
+.conn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.conn-pill .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #b9c3d6;
+}
+.conn-pill.connected .dot { background: var(--blue-primary); box-shadow: 0 0 0 3px var(--blue-pale); }
+.conn-pill.error .dot { background: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
+
+select.lang-select {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue-deep);
+  background: var(--blue-pale);
+  border: 1px solid var(--blue-line);
+  border-radius: 999px;
+  padding: 7px 14px;
+}
+
+.lang-toggle {
+  display: inline-flex;
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+.lang-toggle button {
+  border: none;
+  background: transparent;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--blue-deep);
+  opacity: 0.55;
+}
+.lang-toggle button.active {
+  background: var(--blue-primary);
+  color: white;
+  opacity: 1;
+}
+
+.emergency-banner {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  background: var(--danger-soft);
+  border-bottom: 1px solid var(--danger);
+  color: var(--danger);
+  padding: 10px 20px;
+  font-weight: 600;
+  font-size: 14px;
+  animation: flash 1.1s ease-in-out infinite;
+}
+.emergency-banner.show { display: flex; }
+@keyframes flash {
+  0%, 100% { background: var(--danger-soft); }
+  50% { background: #f6c7bb; }
+}
+
+/* ---- Message feed ---- */
+.chat-feed {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chat-placeholder {
+  margin: auto;
+  text-align: center;
+  color: var(--ink-soft);
+  max-width: 280px;
+  font-size: 14px;
+}
+
+.bubble {
+  max-width: 78%;
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 3px rgba(23, 35, 61, 0.05);
+}
+.bubble.mine {
+  align-self: flex-end;
+  background: var(--blue-pale);
+  border-color: var(--blue-line);
+  border-bottom-right-radius: 4px;
+}
+.bubble.theirs {
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+}
+.bubble.pending { opacity: 0.75; }
+
+.bubble-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.bubble-meta .chip {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--blue-pale);
+  color: var(--blue-deep);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.bubble-meta .chip.clay { background: var(--danger-soft); color: var(--danger); }
+.bubble-meta .chip.gold { background: var(--gold-soft); color: #8a6417; }
+
+.bubble-original {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed var(--line);
+}
+.bubble-translated {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.bubble-summary {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+  font-size: 13px;
+  color: var(--blue-deep);
+}
+.bubble-summary b {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 3px;
+}
+
+.typing-dots {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  height: 14px;
+}
+.typing-dots span {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--blue-primary);
+  animation: typing-bounce 1.2s infinite ease-in-out;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.15s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+.explain-btn {
+  margin-top: 8px;
+  border: 1px solid var(--blue-line);
+  background: var(--blue-pale);
+  color: var(--blue-deep);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+}
+.explain-btn:hover { background: #e2ecff; }
+
+.terms-panel {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+.terms-panel .term-row { margin-bottom: 6px; }
+.terms-panel .term-row:last-child { margin-bottom: 0; }
+.terms-panel .term-name { font-weight: 700; color: var(--blue-deep); }
+.terms-panel .term-empty { color: var(--ink-soft); font-style: italic; }
+
+/* ---- Composer ---- */
+.chat-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+.chat-composer textarea {
+  flex: 1;
+  resize: none;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  max-height: 100px;
+  color: var(--ink);
+}
+.chat-composer textarea:focus { outline: 2px solid var(--blue-primary); outline-offset: -1px; }
+
+.send-btn {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: var(--blue-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.send-btn:disabled { background: #b9c3d6; }
+.send-btn svg { width: 18px; height: 18px; fill: white; }
+
+/* ---- Push-to-talk mic (reused shape from doctor.html, re-themed) ---- */
+.ptt-btn {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: var(--surface-sunken);
+  color: var(--blue-deep);
+  border: 1px solid var(--blue-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s ease, transform 0.1s ease;
+  -webkit-user-select: none; user-select: none;
+  touch-action: none;
+}
+.ptt-btn svg { width: 18px; height: 18px; fill: var(--blue-deep); }
+.ptt-btn.recording {
+  background: var(--danger);
+  border-color: var(--danger);
+  transform: scale(1.08);
+}
+.ptt-btn.recording svg { fill: white; }
+
+.waveform {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 20px;
+}
+.waveform .bar {
+  width: 3px;
+  min-height: 4px;
+  border-radius: 2px;
+  background: var(--danger);
+  transition: height 0.08s ease-out;
+}

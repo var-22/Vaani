@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MedVoice Chat — Doctor</title>
+<link rel="stylesheet" href="chat.css" />
+<script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+</head>
+<body>
+
+<div class="chat-app" id="chatApp">
+  <header class="chat-header">
+    <div class="brand"><span class="dot"></span>MedVoice Chat — Doctor</div>
+    <div class="header-controls">
+      <div class="lang-toggle" id="replyLangToggle">
+        <button data-lang="ta-IN">Reply: தமிழ்</button>
+        <button class="active" data-lang="en-IN">Reply: English</button>
+      </div>
+      <span class="conn-pill" id="connPill"><span class="dot"></span><span id="connLabel">connecting</span></span>
+      <a class="mode-link" id="voiceLink" href="doctor.html">🎙️ Voice call</a>
+    </div>
+  </header>
+
+  <div class="emergency-banner" id="emergencyBanner">⚠ Emergency flagged — immediate attention recommended</div>
+
+  <div class="chat-feed" id="feed">
+    <div class="chat-placeholder" id="placeholder">Waiting for the patient to join and write or speak. Translated messages will appear here in real time.</div>
+  </div>
+
+  <div class="chat-composer">
+    <button class="ptt-btn" id="pttBtn" title="Hold to speak">
+      <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 003-3V6a3 3 0 00-6 0v5a3 3 0 003 3zm5-3a5 5 0 01-10 0H5a7 7 0 006 6.92V21h2v-3.08A7 7 0 0019 11h-2z"/></svg>
+    </button>
+    <textarea id="messageInput" rows="1" placeholder="Type a message for the patient..."></textarea>
+    <button class="send-btn" id="sendBtn">
+      <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+  const BACKEND_URL = window.MEDVOICE_BACKEND_URL || 'http://localhost:8080';
+  let LIVEKIT_URL = window.MEDVOICE_LIVEKIT_URL || '';
+
+  const params = new URLSearchParams(window.location.search);
+  const room = params.get('room') || 'consult-demo';
+  const doctorId = 'd' + Math.floor(Math.random() * 100000);
+  document.getElementById('voiceLink').href = `doctor.html?room=${encodeURIComponent(room)}`;
+
+  function newId() {
+    return (crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+  }
+
+  let livekitRoom = null;
+  let replyLanguage = 'en-IN';
+
+  const connPill = document.getElementById('connPill');
+  const connLabel = document.getElementById('connLabel');
+  const emergencyBanner = document.getElementById('emergencyBanner');
+  const feed = document.getElementById('feed');
+  const placeholder = document.getElementById('placeholder');
+  const messageInput = document.getElementById('messageInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const pttBtn = document.getElementById('pttBtn');
+
+  function escapeHtml(s) {
+    return (s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function clearPlaceholder() {
+    if (placeholder.parentNode) placeholder.remove();
+  }
+
+  // ------------------------------------------------------------------
+  // Reply-language toggle — identical wire format to doctor.html so both
+  // modes control the same agent-side state.
+  // ------------------------------------------------------------------
+  function setReplyLangButtons() {
+    document.querySelectorAll('#replyLangToggle button').forEach(b => {
+      b.classList.toggle('active', b.dataset.lang === replyLanguage);
+      b.onclick = () => {
+        replyLanguage = b.dataset.lang;
+        setReplyLangButtons();
+        if (livekitRoom) {
+          livekitRoom.localParticipant.publishData(
+            new TextEncoder().encode(JSON.stringify({ language: replyLanguage })),
+            { reliable: true, topic: 'doctor-reply-language' }
+          );
+        }
+      };
+    });
+  }
+  setReplyLangButtons();
+
+  function renderPendingBubble(messageId, text) {
+    clearPlaceholder();
+    const el = document.createElement('div');
+    el.className = 'bubble mine pending';
+    el.dataset.messageId = messageId;
+    el.innerHTML = `
+      <div class="bubble-meta"><span>You</span></div>
+      <div class="bubble-translated">${escapeHtml(text)}</div>
+      <div class="typing-dots"><span></span><span></span><span></span></div>
+    `;
+    feed.appendChild(el);
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  function resolveMineBubble(payload) {
+    let el = payload.message_id ? feed.querySelector(`.bubble.mine[data-message-id="${payload.message_id}"]`) : null;
+    if (!el) {
+      clearPlaceholder();
+      el = document.createElement('div');
+      el.className = 'bubble mine';
+      feed.appendChild(el);
+    } else {
+      el.classList.remove('pending');
+    }
+    el.innerHTML = `
+      <div class="bubble-meta"><span>You → ${escapeHtml(payload.target_language || '')}</span></div>
+      <div class="bubble-translated">${escapeHtml(payload.original_transcript || '')}</div>
+      <div class="bubble-original">Translated for patient: ${escapeHtml(payload.translated_text || '')}</div>
+    `;
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  function renderTheirsBubble(payload) {
+    clearPlaceholder();
+    const el = document.createElement('div');
+    el.className = 'bubble theirs';
+    el.innerHTML = `
+      <div class="bubble-meta">
+        <span class="chip">${escapeHtml(payload.patient_language || '—')}</span>
+        ${payload.is_emergency ? '<span class="chip clay">EMERGENCY</span>' : ''}
+      </div>
+      <div class="bubble-original">${escapeHtml(payload.original_transcript || '')}</div>
+      <div class="bubble-translated">${escapeHtml(payload.english_translation || '')}</div>
+      ${payload.doctor_summary ? `<div class="bubble-summary"><b>Clinical summary</b>${escapeHtml(payload.doctor_summary)}</div>` : ''}
+      <button class="explain-btn" type="button">What does this mean?</button>
+    `;
+    feed.appendChild(el);
+    wireExplainButton(el, payload.english_translation || '');
+    feed.scrollTop = feed.scrollHeight;
+    if (payload.is_emergency) {
+      emergencyBanner.classList.add('show');
+    }
+  }
+
+  function wireExplainButton(bubbleEl, text) {
+    const btn = bubbleEl.querySelector('.explain-btn');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = 'Explaining…';
+      try {
+        const res = await fetch(`${BACKEND_URL}/explain-terms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, target_language: 'en-IN' }),
+        });
+        const data = await res.json();
+        const panel = document.createElement('div');
+        panel.className = 'terms-panel';
+        if (data.terms && data.terms.length) {
+          panel.innerHTML = data.terms.map(t =>
+            `<div class="term-row"><span class="term-name">${escapeHtml(t.term)}</span>: ${escapeHtml(t.explanation)}</div>`
+          ).join('');
+        } else {
+          panel.innerHTML = `<div class="term-empty">No medical terms to explain here.</div>`;
+        }
+        bubbleEl.appendChild(panel);
+        btn.remove();
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = 'What does this mean? (retry)';
+      }
+    });
+  }
+
+  function sendTextMessage() {
+    const text = messageInput.value.trim();
+    if (!text || !livekitRoom) return;
+    const messageId = newId();
+    renderPendingBubble(messageId, text);
+    livekitRoom.localParticipant.publishData(
+      new TextEncoder().encode(JSON.stringify({ text, message_id: messageId })),
+      { reliable: true, topic: 'chat-message' }
+    );
+    messageInput.value = '';
+  }
+
+  sendBtn.addEventListener('click', sendTextMessage);
+  messageInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendTextMessage();
+    }
+  });
+
+  // ------------------------------------------------------------------
+  // Push-to-talk mic + live level meter (same pattern as doctor.html).
+  // ------------------------------------------------------------------
+  let audioCtx = null, analyser = null, meterStream = null;
+
+  async function startMeter() {
+    try {
+      meterStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(meterStream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+    } catch (err) {
+      console.warn('Mic level meter unavailable:', err);
+    }
+  }
+
+  function stopMeter() {
+    analyser = null;
+    if (meterStream) meterStream.getTracks().forEach(t => t.stop());
+    meterStream = null;
+    if (audioCtx) audioCtx.close();
+    audioCtx = null;
+  }
+
+  async function startReply() {
+    if (!livekitRoom) return;
+    pttBtn.classList.add('recording');
+    await livekitRoom.localParticipant.setMicrophoneEnabled(true);
+    await startMeter();
+  }
+
+  async function stopReply() {
+    if (!livekitRoom) return;
+    pttBtn.classList.remove('recording');
+    await livekitRoom.localParticipant.setMicrophoneEnabled(false);
+    stopMeter();
+  }
+
+  pttBtn.addEventListener('mousedown', startReply);
+  pttBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startReply(); });
+  pttBtn.addEventListener('mouseup', stopReply);
+  pttBtn.addEventListener('mouseleave', () => { if (pttBtn.classList.contains('recording')) stopReply(); });
+  pttBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopReply(); });
+
+  const decoder = new TextDecoder();
+
+  async function connect() {
+    if (!LIVEKIT_URL) {
+      const configRes = await fetch(`${BACKEND_URL}/config`);
+      LIVEKIT_URL = (await configRes.json()).livekit_url;
+    }
+    const res = await fetch(`${BACKEND_URL}/token?room=${encodeURIComponent(room)}&identity=${doctorId}&role=doctor`);
+    const { token } = await res.json();
+
+    livekitRoom = new LivekitClient.Room({ adaptiveStream: true, dynacast: true });
+
+    livekitRoom.on(LivekitClient.RoomEvent.DataReceived, (payload, participant, kind, topic) => {
+      let data;
+      try { data = JSON.parse(decoder.decode(payload)); } catch (e) { return; }
+      if (topic === 'doctor-transcript' || data.type === 'medical_translation') {
+        renderTheirsBubble(data);
+      }
+      if (topic === 'patient-transcript' || data.type === 'doctor_reply') {
+        resolveMineBubble(data);
+      }
+      if (topic === 'emergency-alert' || data.type === 'emergency_alert') {
+        emergencyBanner.classList.add('show');
+      }
+    });
+
+    livekitRoom.on(LivekitClient.RoomEvent.TrackSubscribed, (track) => {
+      if (track.kind === 'audio') {
+        const el = track.attach();
+        document.body.appendChild(el);
+      }
+    });
+
+    livekitRoom.on(LivekitClient.RoomEvent.Disconnected, (reason) => {
+      connPill.className = 'conn-pill error';
+      connLabel.textContent = reason ? `disconnected · ${reason}` : 'disconnected';
+    });
+
+    await livekitRoom.connect(LIVEKIT_URL, token);
+    connPill.className = 'conn-pill connected';
+    connLabel.textContent = `connected · room ${room}`;
+
+    livekitRoom.localParticipant.publishData(
+      new TextEncoder().encode(JSON.stringify({ language: replyLanguage })),
+      { reliable: true, topic: 'doctor-reply-language' }
+    );
+  }
+
+  connect();
+</script>
+</body>
+</html>

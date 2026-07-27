@@ -1,0 +1,22 @@
+# Secrets -- never commit real credentials
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# Editor/OS junk
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Scratch/debug scripts used during development
+scratch_*.py
+_gemma_check.py

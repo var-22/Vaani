@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>MedVoice Chat — Patient</title>
+<link rel="stylesheet" href="chat.css" />
+<script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+<style>
+  .connect-screen {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 24px;
+    text-align: center;
+  }
+  .connect-screen h1 { font-size: 26px; margin: 0; color: var(--blue-deep); }
+  .connect-screen p { color: var(--ink-soft); max-width: 300px; margin: 0; }
+  .join-button {
+    margin-top: 8px;
+    padding: 14px 36px;
+    border-radius: 999px;
+    border: none;
+    background: var(--blue-primary);
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<div id="connectScreen" class="connect-screen">
+  <h1>MedVoice Chat</h1>
+  <p>Chat with the doctor in your own language.</p>
+  <select class="lang-select" id="langSelectPre">
+    <option value="ta-IN">தமிழ் (Tamil)</option>
+    <option value="en-IN">English</option>
+  </select>
+  <button class="join-button" id="joinBtn">Start chat</button>
+</div>
+
+<div class="chat-app" id="chatApp" style="display:none;">
+  <header class="chat-header">
+    <div class="brand"><span class="dot"></span>MedVoice Chat</div>
+    <div class="header-controls">
+      <select class="lang-select" id="langSelect">
+        <option value="ta-IN">தமிழ்</option>
+        <option value="en-IN">English</option>
+      </select>
+      <span class="conn-pill" id="connPill"><span class="dot"></span><span id="connLabel">connecting</span></span>
+      <a class="mode-link" id="voiceLink" href="patient.html">🎙️ Voice call</a>
+    </div>
+  </header>
+
+  <div class="chat-feed" id="feed">
+    <div class="chat-placeholder" id="placeholder">Say hello, or describe how you're feeling — your message will be translated for the doctor automatically.</div>
+  </div>
+
+  <div class="chat-composer">
+    <button class="ptt-btn" id="pttBtn" title="Hold to speak">
+      <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 003-3V6a3 3 0 00-6 0v5a3 3 0 003 3zm5-3a5 5 0 01-10 0H5a7 7 0 006 6.92V21h2v-3.08A7 7 0 0019 11h-2z"/></svg>
+    </button>
+    <textarea id="messageInput" rows="1" placeholder="Type a message..."></textarea>
+    <button class="send-btn" id="sendBtn">
+      <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+  const BACKEND_URL = window.MEDVOICE_BACKEND_URL || 'http://localhost:8080';
+  let LIVEKIT_URL = window.MEDVOICE_LIVEKIT_URL || '';
+
+  const params = new URLSearchParams(window.location.search);
+  const room = params.get('room') || 'consult-demo';
+  const patientId = 'p' + Math.floor(Math.random() * 100000);
+  document.getElementById('voiceLink').href = `patient.html?room=${encodeURIComponent(room)}`;
+
+  function newId() {
+    return (crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+  }
+
+  let selectedLang = 'ta-IN';
+  let livekitRoom = null;
+
+  const connPill = document.getElementById('connPill');
+  const connLabel = document.getElementById('connLabel');
+  const feed = document.getElementById('feed');
+  const placeholder = document.getElementById('placeholder');
+  const messageInput = document.getElementById('messageInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const pttBtn = document.getElementById('pttBtn');
+
+  function syncLangSelects(source) {
+    selectedLang = source.value;
+    document.getElementById('langSelectPre').value = selectedLang;
+    document.getElementById('langSelect').value = selectedLang;
+  }
+  document.getElementById('langSelectPre').addEventListener('change', (e) => syncLangSelects(e.target));
+  document.getElementById('langSelect').addEventListener('change', (e) => syncLangSelects(e.target));
+
+  function escapeHtml(s) {
+    return (s || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function clearPlaceholder() {
+    if (placeholder.parentNode) placeholder.remove();
+  }
+
+  function renderPendingBubble(messageId, text) {
+    clearPlaceholder();
+    const el = document.createElement('div');
+    el.className = 'bubble mine pending';
+    el.dataset.messageId = messageId;
+    el.innerHTML = `
+      <div class="bubble-meta"><span>You</span></div>
+      <div class="bubble-translated">${escapeHtml(text)}</div>
+      <div class="typing-dots"><span></span><span></span><span></span></div>
+    `;
+    feed.appendChild(el);
+    feed.scrollTop = feed.scrollHeight;
+    return el;
+  }
+
+  function resolveMineBubble(payload) {
+    let el = payload.message_id ? feed.querySelector(`.bubble.mine[data-message-id="${payload.message_id}"]`) : null;
+    if (!el) {
+      clearPlaceholder();
+      el = document.createElement('div');
+      el.className = 'bubble mine';
+      feed.appendChild(el);
+    } else {
+      el.classList.remove('pending');
+    }
+    el.innerHTML = `
+      <div class="bubble-meta"><span>You</span>${payload.is_emergency ? '<span class="chip clay">EMERGENCY</span>' : ''}</div>
+      <div class="bubble-translated">${escapeHtml(payload.original_transcript || '')}</div>
+      <div class="bubble-original">Translated for doctor: ${escapeHtml(payload.english_translation || '')}</div>
+      <button class="explain-btn" type="button">What does this mean?</button>
+    `;
+    wireExplainButton(el, payload.original_transcript || '');
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  function renderTheirsBubble(payload) {
+    clearPlaceholder();
+    const el = document.createElement('div');
+    el.className = 'bubble theirs';
+    el.innerHTML = `
+      <div class="bubble-meta"><span>Doctor</span></div>
+      <div class="bubble-translated">${escapeHtml(payload.translated_text || '')}</div>
+      <div class="bubble-original">Original: ${escapeHtml(payload.original_transcript || '')}</div>
+      <button class="explain-btn" type="button">What does this mean?</button>
+    `;
+    feed.appendChild(el);
+    wireExplainButton(el, payload.translated_text || '');
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  function wireExplainButton(bubbleEl, text) {
+    const btn = bubbleEl.querySelector('.explain-btn');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = 'Explaining…';
+      try {
+        const res = await fetch(`${BACKEND_URL}/explain-terms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, target_language: selectedLang }),
+        });
+        const data = await res.json();
+        const panel = document.createElement('div');
+        panel.className = 'terms-panel';
+        if (data.terms && data.terms.length) {
+          panel.innerHTML = data.terms.map(t =>
+            `<div class="term-row"><span class="term-name">${escapeHtml(t.term)}</span>: ${escapeHtml(t.explanation)}</div>`
+          ).join('');
+        } else {
+          panel.innerHTML = `<div class="term-empty">No medical terms to explain here.</div>`;
+        }
+        bubbleEl.appendChild(panel);
+        btn.remove();
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = 'What does this mean? (retry)';
+      }
+    });
+  }
+
+  function sendTextMessage() {
+    const text = messageInput.value.trim();
+    if (!text || !livekitRoom) return;
+    const messageId = newId();
+    renderPendingBubble(messageId, text);
+    livekitRoom.localParticipant.publishData(
+      new TextEncoder().encode(JSON.stringify({ text, message_id: messageId })),
+      { reliable: true, topic: 'chat-message' }
+    );
+    messageInput.value = '';
+  }
+
+  sendBtn.addEventListener('click', sendTextMessage);
+  messageInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendTextMessage();
+    }
+  });
+
+  // ------------------------------------------------------------------
+  // Push-to-talk mic + live level meter (same AnalyserNode technique as
+  // the voice-call pages).
+  // ------------------------------------------------------------------
+  let audioCtx = null, analyser = null, meterRafId = null, meterStream = null;
+
+  async function startMeter() {
+    try {
+      meterStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(meterStream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.6;
+      source.connect(analyser);
+    } catch (err) {
+      console.warn('Mic level meter unavailable:', err);
+    }
+  }
+
+  function stopMeter() {
+    if (meterRafId) cancelAnimationFrame(meterRafId);
+    meterRafId = null;
+    analyser = null;
+    if (meterStream) meterStream.getTracks().forEach(t => t.stop());
+    meterStream = null;
+    if (audioCtx) audioCtx.close();
+    audioCtx = null;
+  }
+
+  async function startReply() {
+    if (!livekitRoom) return;
+    pttBtn.classList.add('recording');
+    await livekitRoom.localParticipant.setMicrophoneEnabled(true);
+    await startMeter();
+  }
+
+  async function stopReply() {
+    if (!livekitRoom) return;
+    pttBtn.classList.remove('recording');
+    await livekitRoom.localParticipant.setMicrophoneEnabled(false);
+    stopMeter();
+  }
+
+  pttBtn.addEventListener('mousedown', startReply);
+  pttBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startReply(); });
+  pttBtn.addEventListener('mouseup', stopReply);
+  pttBtn.addEventListener('mouseleave', () => { if (pttBtn.classList.contains('recording')) stopReply(); });
+  pttBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopReply(); });
+
+  const decoder = new TextDecoder();
+
+  async function joinChat() {
+    document.getElementById('connectScreen').style.display = 'none';
+    document.getElementById('chatApp').style.display = 'flex';
+
+    try {
+      if (!LIVEKIT_URL) {
+        const configRes = await fetch(`${BACKEND_URL}/config`);
+        LIVEKIT_URL = (await configRes.json()).livekit_url;
+      }
+      const res = await fetch(`${BACKEND_URL}/token?room=${encodeURIComponent(room)}&identity=${patientId}&role=patient&language=${encodeURIComponent(selectedLang)}`);
+      const { token } = await res.json();
+
+      livekitRoom = new LivekitClient.Room({ adaptiveStream: true, dynacast: true });
+
+      livekitRoom.on(LivekitClient.RoomEvent.DataReceived, (payload, participant, kind, topic) => {
+        let data;
+        try { data = JSON.parse(decoder.decode(payload)); } catch (e) { return; }
+        if (topic === 'doctor-transcript' || data.type === 'medical_translation') {
+          resolveMineBubble(data);
+        }
+        if (topic === 'patient-transcript' || data.type === 'doctor_reply') {
+          renderTheirsBubble(data);
+        }
+      });
+
+      livekitRoom.on(LivekitClient.RoomEvent.TrackSubscribed, (track) => {
+        if (track.kind === 'audio') {
+          const el = track.attach();
+          document.body.appendChild(el);
+        }
+      });
+
+      livekitRoom.on(LivekitClient.RoomEvent.Disconnected, (reason) => {
+        connPill.className = 'conn-pill error';
+        connLabel.textContent = reason ? `disconnected · ${reason}` : 'disconnected';
+      });
+
+      await livekitRoom.connect(LIVEKIT_URL, token);
+      connPill.className = 'conn-pill connected';
+      connLabel.textContent = 'connected';
+    } catch (error) {
+      console.error('MedVoice chat connection failed', error);
+      connPill.className = 'conn-pill error';
+      connLabel.textContent = 'error';
+    }
+  }
+
+  document.getElementById('joinBtn').addEventListener('click', () => {
+    selectedLang = document.getElementById('langSelectPre').value;
+    document.getElementById('langSelect').value = selectedLang;
+    joinChat();
+  });
+</script>
+</body>
+</html>

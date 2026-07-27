@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MedVoice — AI Voice Translator</title>
+<link rel="stylesheet" href="shared.css" />
+<script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js"></script>
+<style>
+  body { min-height: 100vh; padding-bottom: 24px; }
+
+  .page { max-width: 1200px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; gap: 18px; }
+
+  /* ---- Top bar ---- */
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-icon {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: linear-gradient(160deg, var(--teal-mid), var(--teal-deep));
+    display: flex; align-items: center; justify-content: center;
+  }
+  .brand-icon svg { width: 20px; height: 20px; fill: white; }
+  .brand-text .name { font-family: var(--font-display); font-size: 19px; color: var(--teal-deep); line-height: 1.1; }
+  .brand-text .sub { font-size: 12px; color: #7A8A84; }
+
+  .status-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 600; color: var(--teal-deep);
+    background: var(--teal-soft); padding: 8px 16px; border-radius: 999px;
+  }
+  .status-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--teal-mid); }
+  .status-chip.error .dot { background: var(--clay); }
+
+  .lang-pair { font-size: 13px; font-weight: 600; color: var(--ink); background: var(--paper-raised); border: 1px solid var(--line); padding: 8px 16px; border-radius: 999px; }
+
+  .patient-name-input {
+    font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink);
+    background: var(--paper-raised); border: 1px solid var(--line); border-radius: 999px;
+    padding: 8px 16px; min-width: 160px;
+  }
+  .patient-name-input::placeholder { color: #9AA6A1; font-weight: 500; }
+
+  /* ---- End-of-call summary ---- */
+  .ended-screen { overflow-y: auto; padding: 40px 20px; }
+  .ended-inner { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; max-width: 560px; margin: 0 auto; }
+  .summary-card { display: none; width: 100%; text-align: left; background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+  .summary-card.show { display: block; }
+  .summary-section { margin-bottom: 16px; }
+  .summary-section:last-child { margin-bottom: 0; }
+  .summary-section h3 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #7A8A84; margin: 0 0 8px; }
+  .summary-row { font-size: 14px; color: var(--ink); margin-bottom: 4px; }
+  .summary-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .summary-emergency { background: var(--clay-soft); border: 1px solid var(--clay); color: var(--clay); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .summary-transcript { max-height: 240px; overflow-y: auto; }
+  .summary-transcript-entry { font-size: 13px; color: var(--ink); margin-bottom: 6px; line-height: 1.4; }
+  .summary-transcript-entry .who { font-weight: 700; color: var(--teal-deep); }
+
+  /* ---- Info cards ---- */
+  .info-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .info-card {
+    background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius-sm);
+    padding: 14px 16px; display: flex; align-items: flex-start; gap: 12px;
+  }
+  .info-card .icon { width: 34px; height: 34px; border-radius: 9px; background: var(--teal-soft); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .info-card .icon svg { width: 18px; height: 18px; fill: var(--teal-deep); }
+  .info-card .title { font-size: 13px; font-weight: 700; color: var(--ink); }
+  .info-card .detail { font-size: 12px; color: #7A8A84; }
+  .info-card .detail.good { color: var(--teal-mid); font-weight: 600; }
+  .info-card .big { font-family: var(--font-mono); font-size: 20px; font-weight: 600; color: var(--teal-deep); font-variant-numeric: tabular-nums; }
+
+  /* ---- Emergency banner ---- */
+  .emergency-banner {
+    display: none; align-items: center; justify-content: center; gap: 10px;
+    background: var(--clay-soft); border: 1px solid var(--clay); color: var(--clay);
+    padding: 10px 18px; border-radius: var(--radius-sm); font-weight: 600; font-size: 14px;
+    animation: flash 1.1s ease-in-out infinite;
+  }
+  .emergency-banner.show { display: flex; }
+  .emergency-banner .reason { font-weight: 400; opacity: 0.9; }
+  @keyframes flash { 0%, 100% { background: var(--clay-soft); } 50% { background: #F6C7BB; } }
+
+  /* ---- Symptom snapshot chip line (under the doctor card) ---- */
+  .symptoms-line { display: none; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: -4px; }
+  .symptoms-line.show { display: flex; }
+  .symptoms-line .chip { background: var(--blue-soft); color: var(--blue-deep); }
+  .symptoms-line .meta { font-size: 11px; color: #7A8A84; align-self: center; }
+
+  /* ---- Role cards ---- */
+  .cards-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .cards-row { grid-template-columns: 1fr; } }
+
+  .role-card {
+    border-radius: var(--radius); border: 1px solid var(--line); background: var(--paper-raised);
+    padding: 22px; display: flex; flex-direction: column; align-items: center; gap: 12px;
+    transition: box-shadow 0.2s ease;
+  }
+  .role-card.patient { background: linear-gradient(180deg, var(--teal-soft) 0%, var(--paper-raised) 40%); border-color: #BFE0D6; }
+  .role-card.doctor { background: linear-gradient(180deg, var(--blue-soft) 0%, var(--paper-raised) 40%); border-color: #C7D7EC; }
+
+  .role-pill { font-size: 12px; font-weight: 700; letter-spacing: 0.03em; padding: 5px 14px; border-radius: 999px; }
+  .role-card.patient .role-pill { background: var(--teal-soft); color: var(--teal-deep); }
+  .role-card.doctor .role-pill { background: var(--blue-soft); color: var(--blue-deep); }
+
+  .role-avatar {
+    width: 128px; height: 128px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 60px; line-height: 1;
+    overflow: hidden;
+    transition: box-shadow 0.25s ease, transform 0.25s ease;
+  }
+  .role-card.patient .role-avatar { background: #CFE9DF; }
+  .role-card.doctor .role-avatar { background: #D2E1F2; }
+  .role-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+  .role-card.state-listening .role-avatar,
+  .role-card.state-processing .role-avatar,
+  .role-card.state-speaking .role-avatar { transform: scale(1.06); }
+  .role-card.patient.state-listening .role-avatar,
+  .role-card.patient.state-processing .role-avatar,
+  .role-card.patient.state-speaking .role-avatar {
+    box-shadow: 0 0 0 6px var(--teal-soft), 0 0 0 11px rgba(46,125,107,0.22);
+  }
+  .role-card.doctor.state-listening .role-avatar,
+  .role-card.doctor.state-processing .role-avatar,
+  .role-card.doctor.state-speaking .role-avatar {
+    box-shadow: 0 0 0 6px var(--blue-soft), 0 0 0 11px rgba(62,111,168,0.22);
+  }
+  .role-card.state-processing .role-avatar { animation: card-processing-pulse 1s ease-in-out infinite; }
+  .role-card.state-speaking .role-avatar { animation: card-speaking-pulse 0.9s ease-in-out infinite; }
+  @keyframes card-processing-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+  @keyframes card-speaking-pulse { 0%, 100% { transform: scale(1.06); } 50% { transform: scale(1.12); } }
+  .role-card.state-error .role-avatar { animation: card-error-shake 0.4s ease; }
+  @keyframes card-error-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
+  .role-waveform { height: 20px; }
+  .role-card.patient .waveform .bar { background: var(--teal-mid); }
+  .role-card.doctor .waveform .bar { background: var(--blue-mid); }
+
+  .card-status-label { font-size: 14px; font-weight: 600; color: var(--ink); min-height: 18px; }
+  .role-card.state-error .card-status-label { color: var(--clay); }
+
+  .role-card select {
+    font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink);
+    background: var(--paper); border: 1px solid var(--line); border-radius: 999px;
+    padding: 6px 14px;
+  }
+
+  /* ---- Live, hands-free turn switching: tap the card, not a button ---- */
+  .role-card { cursor: pointer; }
+  .role-card.active-turn { box-shadow: 0 0 0 3px rgba(46,125,107,0.35); }
+  .role-card.doctor.active-turn { box-shadow: 0 0 0 3px rgba(62,111,168,0.35); }
+  .turn-hint { font-size: 13px; font-weight: 600; color: var(--ink); min-height: 18px; }
+  .role-card.active-turn .turn-hint { color: var(--teal-deep); }
+  .role-card.doctor.active-turn .turn-hint { color: var(--blue-deep); }
+  .turn-guide { text-align: center; font-size: 13px; color: #7A8A84; margin-top: -4px; }
+
+  /* ---- Transcript / Live Translation panel ---- */
+  .transcript-panel {
+    background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px;
+  }
+  .transcript-panel.hidden { display: none; }
+  .transcript-header { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 4px; }
+  .transcript-header h2 { font-family: var(--font-display); font-size: 18px; color: var(--teal-deep); margin: 0; }
+  .transcript-sub { text-align: center; font-size: 12px; color: #7A8A84; margin-bottom: 14px; }
+  .transcript-list { display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; }
+  .transcript-entry {
+    border-radius: var(--radius-sm); padding: 12px 14px;
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+  }
+  .transcript-entry.patient { background: var(--teal-soft); }
+  .transcript-entry.doctor { background: var(--blue-soft); }
+  .transcript-entry .label { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+  .transcript-entry.patient .label { color: var(--teal-deep); }
+  .transcript-entry.doctor .label { color: var(--blue-deep); }
+  .transcript-entry .text { font-size: 14px; color: var(--ink); line-height: 1.4; }
+  .transcript-placeholder { text-align: center; font-size: 13px; color: #7A8A84; padding: 20px 0; }
+  .transcript-footer { text-align: center; font-size: 11px; color: #9AA6A1; margin-top: 12px; }
+
+  /* ---- Bottom controls ---- */
+  .bottom-controls { display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; }
+  .bottom-controls .control-label { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; color: #5B6B65; }
+  .control-btn.on { background: var(--teal-soft); color: var(--teal-deep); border-color: var(--teal-soft); }
+
+  /* ---- Notes overlay ---- */
+  .notes-overlay { position: fixed; inset: 0; background: rgba(16,36,31,0.45); display: none; align-items: center; justify-content: center; z-index: 30; }
+  .notes-overlay.show { display: flex; }
+  .notes-panel { background: var(--paper-raised); border-radius: var(--radius); padding: 20px; width: min(480px, 90vw); }
+  .notes-panel h2 { font-family: var(--font-display); font-size: 18px; color: var(--teal-deep); margin: 0 0 12px; }
+  .notes-panel textarea {
+    width: 100%; min-height: 160px; font-family: inherit; font-size: 14px; padding: 12px;
+    border: 1px solid var(--line); border-radius: var(--radius-sm); resize: vertical;
+  }
+  .notes-panel p { font-size: 11px; color: #9AA6A1; margin: 8px 0 12px; }
+  .notes-close { margin-top: 4px; background: var(--teal-deep); color: white; border: none; border-radius: 999px; padding: 10px 22px; font-weight: 600; }
+
+  /* ---- Tip banner ---- */
+  .tip-banner {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    background: var(--teal-soft); border-radius: var(--radius-sm); padding: 10px 16px; font-size: 13px; color: var(--teal-deep);
+  }
+  .tip-banner.hidden { display: none; }
+  .tip-banner button { background: none; border: none; color: var(--teal-deep); font-size: 16px; line-height: 1; }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="top-bar">
+    <div class="brand">
+      <div class="brand-icon"><svg viewBox="0 0 24 24"><path d="M12 3a1 1 0 011 1v3.17l1.59-1.58a1 1 0 111.41 1.41L13 9v6l3-3a1 1 0 111.41 1.41l-4.7 4.71a1 1 0 01-1.42 0L6.6 13.4A1 1 0 118 12l3 3V9L8.41 6.4A1 1 0 119.82 5L11 6.17V4a1 1 0 011-1z"/></svg></div>
+      <div class="brand-text">
+        <div class="name">MedVoice</div>
+        <div class="sub">AI Voice Translator</div>
+      </div>
+    </div>
+    <span class="status-chip" id="statusChip"><span class="dot"></span><span id="statusChipLabel">Connecting</span></span>
+    <input type="text" id="patientNameInput" class="patient-name-input" placeholder="Patient name (optional)" />
+    <span class="lang-pair" id="langPair">தமிழ் ⇄ English</span>
+  </div>
+
+  <div class="info-row">
+    <div class="info-card">
+      <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 2l8 3v6c0 5-3.4 9.4-8 11-4.6-1.6-8-6-8-11V5l8-3z"/></svg></div>
+      <div><div class="title">Secure &amp; Private</div><div class="detail">Your conversation is end-to-end encrypted</div></div>
+    </div>
+    <div class="info-card">
+      <div class="icon"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1010 10A10 10 0 0012 2zm1 10.59V6h-2v7.41l4.29 4.3 1.42-1.42z"/></svg></div>
+      <div><div class="big" id="callTimer">00:00</div><div class="detail">Call Duration</div></div>
+    </div>
+    <div class="info-card">
+      <div class="icon"><svg viewBox="0 0 24 24"><path d="M2 20h3v-6H2zm5 0h3v-10H7zm5 0h3V6h-3zm5 0h3V2h-3z"/></svg></div>
+      <div><div class="title" id="qualityTitle">Connecting…</div><div class="detail good" id="qualityDetail">—</div></div>
+    </div>
+  </div>
+
+  <div class="emergency-banner" id="emergencyBanner">⚠ Emergency flagged — <span class="reason" id="emergencyReason">immediate attention recommended</span></div>
+
+  <div class="cards-row">
+    <div class="role-card patient state-idle" id="patientCard">
+      <span class="role-pill">YOU (PATIENT)</span>
+      <div class="role-avatar" id="patientAvatar">
+        <img src="https://api.dicebear.com/9.x/avataaars/svg?seed=MedVoice-Patient" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'🧑',style:'font-size:60px'}))" />
+      </div>
+      <div class="role-waveform waveform" id="patientWaveform">
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      </div>
+      <div class="card-status-label" id="patientStatusLabel">Ready</div>
+      <select id="patientLangSelect">
+        <option value="ta-IN">Tamil (You)</option>
+        <option value="en-IN">English (You)</option>
+        <option value="te-IN">Telugu (You)</option>
+      </select>
+      <div class="turn-hint" id="patientTurnHint">Listening live — no tap needed</div>
+    </div>
+
+    <div class="role-card doctor state-idle" id="doctorCard">
+      <span class="role-pill">DOCTOR</span>
+      <div class="role-avatar" id="doctorAvatar">
+        <img src="https://api.dicebear.com/9.x/avataaars/svg?seed=MedVoice-Doctor" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'🧑‍⚕️',style:'font-size:60px'}))" />
+      </div>
+      <div class="role-waveform waveform" id="doctorWaveform">
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      </div>
+      <div class="card-status-label" id="doctorStatusLabel">Ready</div>
+      <select id="doctorLangSelect">
+        <option value="en-IN">English (Doctor)</option>
+        <option value="ta-IN">Tamil (Doctor)</option>
+        <option value="te-IN">Telugu (Doctor)</option>
+      </select>
+      <div class="turn-hint" id="doctorTurnHint">Tap your photo above when it's your turn</div>
+      <div class="symptoms-line" id="symptomsLine"></div>
+    </div>
+  </div>
+  <div class="turn-guide">🎙️ The call listens live, automatically. When it's the other person's turn to speak, tap their photo above.</div>
+
+  <div class="transcript-panel" id="transcriptPanel">
+    <div class="transcript-header">
+      <h2>Live Translation</h2>
+    </div>
+    <div class="transcript-sub">Real-time voice translation</div>
+    <div class="transcript-list" id="transcriptList">
+      <div class="transcript-placeholder" id="transcriptPlaceholder">Tap a card above and start speaking — your conversation will appear here.</div>
+    </div>
+    <div class="transcript-footer">✨ AI Translation — powered by Gemma + Sarvam</div>
+  </div>
+
+  <div class="bottom-controls">
+    <div class="control-label"><button class="control-btn" id="muteBtn" title="Mute microphone"><svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 003-3V6a3 3 0 00-6 0v5a3 3 0 003 3zm5-3a5 5 0 01-10 0H5a7 7 0 006 6.92V21h2v-3.08A7 7 0 0019 11h-2z"/></svg></button>Mute</div>
+    <div class="control-label"><button class="control-btn" id="speakerBtn" title="Speaker on/off"><svg viewBox="0 0 24 24"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg></button>Speaker</div>
+    <div class="control-label"><button class="control-btn end-call" id="endCallBtn" title="End call"><svg viewBox="0 0 24 24"><path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08a.996.996 0 01-.29-.7c0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .27-.11.52-.29.7l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.69-1.36-2.67-1.85a.996.996 0 01-.56-.9v-3.1A17.6 17.6 0 0012 9z"/></svg></button>End Call</div>
+    <div class="control-label"><button class="control-btn on" id="translationBtn" title="Show/hide transcript"><svg viewBox="0 0 24 24"><path d="M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.98-4.17 3.71-6.53H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg></button>Translation</div>
+    <div class="control-label"><button class="control-btn" id="notesBtn" title="Notes"><svg viewBox="0 0 24 24"><path d="M4 4h16v2H4zm0 5h16v2H4zm0 5h10v2H4z"/></svg></button>Notes</div>
+  </div>
+
+  <div class="tip-banner" id="audioDebugBanner" style="display:none; background: var(--clay-soft); color: var(--clay);">
+    <span id="audioDebugText"></span>
+    <button id="audioDebugClose">✕</button>
+  </div>
+
+  <div class="tip-banner" id="tipBanner">
+    <span>💡 Tip: Speak clearly for better translation accuracy. You can switch languages anytime.</span>
+    <button id="tipClose">✕</button>
+  </div>
+</div>
+
+<div class="notes-overlay" id="notesOverlay">
+  <div class="notes-panel">
+    <h2>Consultation Notes</h2>
+    <textarea id="notesText" placeholder="Jot anything down during the visit…"></textarea>
+    <p>Local to this browser tab only — not saved or sent anywhere.</p>
+    <button class="notes-close" id="notesCloseBtn">Done</button>
+  </div>
+</div>
+
+<div class="ended-screen" id="endedScreen" style="display:none; position:fixed; inset:0; background:var(--paper); flex-direction:column; align-items:center; text-align:center;">
+  <div class="ended-inner">
+    <h1 style="font-family:var(--font-display); font-size:26px; color:var(--teal-deep); margin:0;">Call ended</h1>
+    <p id="endedReason" style="color:#5B6B65; margin:0;">Thank you for using MedVoice.</p>
+    <div class="summary-card" id="summaryCard"></div>
+    <button onclick="location.reload()" style="margin-top:10px; padding:14px 32px; border-radius:999px; border:none; background:var(--teal-deep); color:white; font-size:15px; font-weight:600;">Start a new call</button>
+  </div>
+</div>
+
+<script>
+  const BACKEND_URL = window.MEDVOICE_BACKEND_URL || 'http://localhost:8080';
+  let LIVEKIT_URL = window.MEDVOICE_LIVEKIT_URL || '';
+
+  const params = new URLSearchParams(window.location.search);
+  const room = params.get('room') || 'consult-demo';
+  const kioskId = 'k' + Math.floor(Math.random() * 100000);
+
+  const LANG_LABEL = { 'ta-IN': 'தமிழ்', 'en-IN': 'English', 'te-IN': 'తెలుగు' };
+  const STATE_LABEL = {
+    idle: 'Ready',
+    listening: 'Listening…',
+    processing: 'Translating…',
+    speaking: 'Playing translated voice',
+  };
+
+  let livekitRoom = null;
+  let callStartedAt = null;
+  let endedByUser = false;
+  let micMuted = false;
+  let speakerEnabled = true;
+  let currentVolume = 1.0;
+  let agentAudioEl = null;
+  let recordingRole = null; // null | 'patient' | 'doctor'
+  let patientLang = 'ta-IN';
+  let doctorLang = 'en-IN';
+  let currentState = 'idle';
+  let currentSourceRole = null;
+  let currentDestRole = null;
+
+  // Accumulated across the whole call so the end-of-call summary can show
+  // everything the doctor needs at a glance, not just the most recent
+  // utterance (which is all the live symptomsLine/emergencyBanner show).
+  let symptomHistory = [];   // [{symptoms:[...], duration, severity}, ...]
+  let emergencyHistory = []; // [{level, reason, action}, ...]
+  let extractedPatientDetails = { name: '', age: '', gender: '' }; // AI-extracted from speech
+
+  const statusChip = document.getElementById('statusChip');
+  const statusChipLabel = document.getElementById('statusChipLabel');
+  const langPair = document.getElementById('langPair');
+  const callTimer = document.getElementById('callTimer');
+  const qualityTitle = document.getElementById('qualityTitle');
+  const qualityDetail = document.getElementById('qualityDetail');
+  const emergencyBanner = document.getElementById('emergencyBanner');
+  const emergencyReason = document.getElementById('emergencyReason');
+  const symptomsLine = document.getElementById('symptomsLine');
+  const patientCard = document.getElementById('patientCard');
+  const doctorCard = document.getElementById('doctorCard');
+  const patientStatusLabel = document.getElementById('patientStatusLabel');
+  const doctorStatusLabel = document.getElementById('doctorStatusLabel');
+  const patientAvatar = document.getElementById('patientAvatar');
+  const doctorAvatar = document.getElementById('doctorAvatar');
+  const patientTurnHint = document.getElementById('patientTurnHint');
+  const doctorTurnHint = document.getElementById('doctorTurnHint');
+  const patientLangSelect = document.getElementById('patientLangSelect');
+  const doctorLangSelect = document.getElementById('doctorLangSelect');
+  const patientBars = document.querySelectorAll('#patientWaveform .bar');
+  const doctorBars = document.querySelectorAll('#doctorWaveform .bar');
+  const transcriptList = document.getElementById('transcriptList');
+  const transcriptPlaceholder = document.getElementById('transcriptPlaceholder');
+  const transcriptPanel = document.getElementById('transcriptPanel');
+  const muteBtn = document.getElementById('muteBtn');
+  const speakerBtn = document.getElementById('speakerBtn');
+  const endCallBtn = document.getElementById('endCallBtn');
+  const translationBtn = document.getElementById('translationBtn');
+  const notesBtn = document.getElementById('notesBtn');
+  const notesOverlay = document.getElementById('notesOverlay');
+  const endedScreen = document.getElementById('endedScreen');
+  const endedReason = document.getElementById('endedReason');
+  const summaryCard = document.getElementById('summaryCard');
+  const patientNameInput = document.getElementById('patientNameInput');
+  const tipBanner = document.getElementById('tipBanner');
+  const audioDebugBanner = document.getElementById('audioDebugBanner');
+  const audioDebugText = document.getElementById('audioDebugText');
+
+  function showAudioDebug(message) {
+    audioDebugText.textContent = message;
+    audioDebugBanner.style.display = 'flex';
+  }
+  document.getElementById('audioDebugClose').addEventListener('click', () => {
+    audioDebugBanner.style.display = 'none';
+  });
+
+  function updateLangPair() {
+    langPair.textContent = `${LANG_LABEL[patientLang]} ⇄ ${LANG_LABEL[doctorLang]}`;
+  }
+  patientLangSelect.addEventListener('change', () => {
+    patientLang = patientLangSelect.value;
+    updateLangPair();
+    if (livekitRoom) {
+      livekitRoom.localParticipant.publishData(
+        new TextEncoder().encode(JSON.stringify({ language: patientLang })),
+        { reliable: true, topic: 'patient-language' }
+      );
+    }
+  });
+  doctorLangSelect.addEventListener('change', () => {
+    doctorLang = doctorLangSelect.value;
+    updateLangPair();
+    if (livekitRoom) {
+      livekitRoom.localParticipant.publishData(
+        new TextEncoder().encode(JSON.stringify({ language: doctorLang })),
+        { reliable: true, topic: 'doctor-reply-language' }
+      );
+    }
+  });
+  updateLangPair();
+
+  function formatTimer(ms) {
+    const total = Math.floor(ms / 1000);
+    const m = String(Math.floor(total / 60)).padStart(2, '0');
+    const s = String(total % 60).padStart(2, '0');
+    return `${m}:${s}`;
+  }
+  setInterval(() => {
+    if (callStartedAt) callTimer.textContent = formatTimer(Date.now() - callStartedAt);
+  }, 500);
+
+  // ------------------------------------------------------------------
+  // Per-card call-state machine, driven by agent.py's "call-status"
+  // events. Since both roles share one screen, the SOURCE card highlights
+  // while it's being listened to / translated, and the DESTINATION card
+  // highlights while the translated audio plays to it.
+  // ------------------------------------------------------------------
+  function setCardState(role, state, message) {
+    const card = role === 'patient' ? patientCard : doctorCard;
+    const label = role === 'patient' ? patientStatusLabel : doctorStatusLabel;
+    card.classList.remove('state-idle', 'state-listening', 'state-processing', 'state-speaking', 'state-error');
+    card.classList.add(`state-${state}`);
+    label.textContent = state === 'error' ? (message || 'Something went wrong.') : STATE_LABEL[state];
+  }
+
+  let errorRevertTimer = null;
+  function applyCallState(state, direction, message) {
+    currentState = state;
+    currentSourceRole = direction === 'patient_to_doctor' ? 'patient' : direction === 'doctor_to_patient' ? 'doctor' : null;
+    currentDestRole = currentSourceRole === 'patient' ? 'doctor' : currentSourceRole === 'doctor' ? 'patient' : null;
+
+    if (state === 'listening' || state === 'processing') {
+      setCardState('patient', currentSourceRole === 'patient' ? state : 'idle');
+      setCardState('doctor', currentSourceRole === 'doctor' ? state : 'idle');
+    } else if (state === 'speaking') {
+      setCardState('patient', currentDestRole === 'patient' ? 'speaking' : 'idle');
+      setCardState('doctor', currentDestRole === 'doctor' ? 'speaking' : 'idle');
+      // The agent says translated audio should be playing right now — check
+      // shortly after whether it actually is, and say exactly why if not,
+      // instead of leaving it silently "stuck" with no explanation.
+      setTimeout(() => {
+        if (currentState !== 'speaking') return; // already finished/moved on — fine
+        if (!agentAudioEl) {
+          showAudioDebug('⚠ The agent says it\'s speaking, but no audio track has been received yet.');
+        } else if (agentAudioEl.paused) {
+          showAudioDebug('⚠ Translated audio is blocked by the browser (paused). Tap anywhere on the page, then speak again.');
+        } else if (agentAudioEl.muted || !speakerEnabled) {
+          showAudioDebug('⚠ Speaker is muted — tap the Speaker button in the control bar to unmute.');
+        } else if (outputAudioCtx && outputAudioCtx.state === 'suspended') {
+          showAudioDebug('⚠ Audio output is suspended by the browser. Tap anywhere on the page, then speak again.');
+        }
+      }, 1200);
+    } else if (state === 'error') {
+      setCardState(currentSourceRole || 'patient', 'error', message);
+    } else {
+      setCardState('patient', 'idle');
+      setCardState('doctor', 'idle');
+    }
+
+    clearTimeout(errorRevertTimer);
+    if (state === 'error') {
+      errorRevertTimer = setTimeout(() => applyCallState('idle'), 3000);
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Real amplitude sources: the local mic while a card is actively
+  // recording, and the agent's actual output level while a card is the
+  // current "speaking" destination. No decorative loops.
+  // ------------------------------------------------------------------
+  let micAudioCtx = null, micAnalyser = null, micStream = null;
+  let outputAudioCtx = null, outputAnalyser = null;
+
+  async function startMicMeter() {
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = micAudioCtx.createMediaStreamSource(micStream);
+      micAnalyser = micAudioCtx.createAnalyser();
+      micAnalyser.fftSize = 256;
+      micAnalyser.smoothingTimeConstant = 0.6;
+      source.connect(micAnalyser);
+    } catch (err) {
+      console.warn('Mic level meter unavailable:', err);
+    }
+  }
+
+  function setupOutputAnalyser(audioEl) {
+    try {
+      outputAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = outputAudioCtx.createMediaElementSource(audioEl);
+      outputAnalyser = outputAudioCtx.createAnalyser();
+      outputAnalyser.fftSize = 256;
+      source.connect(outputAnalyser);
+      source.connect(outputAudioCtx.destination); // must reconnect or audio goes silent
+      unlockAudio(); // this context is created outside a user gesture (from
+      // TrackSubscribed), so browsers start it "suspended" — with
+      // createMediaElementSource in the loop, a suspended context means
+      // total silence even though the <audio> element looks like it's
+      // playing. Try immediately, and again on the next real user tap.
+    } catch (err) {
+      console.warn('Output level meter unavailable:', err);
+    }
+  }
+
+  // Resumes the output AudioContext and retries .play() on the agent's
+  // audio element. Safe to call anytime; only actually does anything when
+  // the context is suspended. Call this from every user-gesture handler
+  // (tap-to-talk, mute, speaker) since only a real gesture can unlock it.
+  function unlockAudio() {
+    if (outputAudioCtx && outputAudioCtx.state === 'suspended') {
+      outputAudioCtx.resume().catch(() => {});
+    }
+    if (agentAudioEl && agentAudioEl.paused) {
+      agentAudioEl.play().catch(() => {});
+    }
+  }
+  document.addEventListener('click', unlockAudio);
+
+  function animateBars(bars, analyser) {
+    if (!analyser) {
+      bars.forEach(bar => { bar.style.height = '4px'; bar.style.opacity = '0.35'; });
+      return;
+    }
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(data);
+    bars.forEach((bar, i) => {
+      const sample = data[Math.min(data.length - 1, i * 12 + 4)] / 255;
+      bar.style.height = `${Math.max(4, sample * 22)}px`;
+      bar.style.opacity = 0.5 + sample * 0.5;
+    });
+  }
+
+  function tickWaveform() {
+    animateBars(patientBars, recordingRole === 'patient' ? micAnalyser : (currentState === 'speaking' && currentDestRole === 'patient' ? outputAnalyser : null));
+    animateBars(doctorBars, recordingRole === 'doctor' ? micAnalyser : (currentState === 'speaking' && currentDestRole === 'doctor' ? outputAnalyser : null));
+    requestAnimationFrame(tickWaveform);
+  }
+
+  // ------------------------------------------------------------------
+  // Live, hands-free turn switching — there's no "tap to speak" button.
+  // The mic starts listening continuously the moment the call connects
+  // (defaulting to the patient), and every sentence is translated
+  // automatically via VAD as soon as it's spoken — no button press per
+  // utterance. Since this is one shared microphone, switching whose turn
+  // it is still needs *some* signal — tapping the other person's card is
+  // that signal, not a "record" button; the mic never stops between turns.
+  // ------------------------------------------------------------------
+  async function switchToRole(role) {
+    if (!livekitRoom || micMuted || recordingRole === role) return;
+    livekitRoom.localParticipant.publishData(
+      new TextEncoder().encode(JSON.stringify({ role })),
+      { reliable: true, topic: 'active-role' }
+    );
+    recordingRole = role;
+    await livekitRoom.localParticipant.setMicrophoneEnabled(true);
+    updateTurnUI();
+  }
+
+  function updateTurnUI() {
+    patientCard.classList.toggle('active-turn', recordingRole === 'patient');
+    doctorCard.classList.toggle('active-turn', recordingRole === 'doctor');
+    patientTurnHint.textContent = recordingRole === 'patient' ? '🎙️ Listening live…' : "Tap this photo when it's the patient's turn";
+    doctorTurnHint.textContent = recordingRole === 'doctor' ? '🎙️ Listening live…' : "Tap this photo when it's the doctor's turn";
+  }
+
+  patientAvatar.closest('.role-card').addEventListener('click', (e) => {
+    if (e.target.tagName === 'SELECT') return; // let the language picker work normally
+    switchToRole('patient');
+  });
+  doctorAvatar.closest('.role-card').addEventListener('click', (e) => {
+    if (e.target.tagName === 'SELECT') return;
+    switchToRole('doctor');
+  });
+
+  // ------------------------------------------------------------------
+  // Transcript panel
+  // ------------------------------------------------------------------
+  function addTranscriptEntry(role, label, text) {
+    if (transcriptPlaceholder.parentNode) transcriptPlaceholder.remove();
+    const el = document.createElement('div');
+    el.className = `transcript-entry ${role}`;
+    const span = document.createElement('div');
+    const labelEl = document.createElement('div');
+    labelEl.className = 'label';
+    labelEl.textContent = label;
+    const textEl = document.createElement('div');
+    textEl.className = 'text';
+    textEl.textContent = text;
+    span.appendChild(labelEl);
+    span.appendChild(textEl);
+    el.appendChild(span);
+    transcriptList.appendChild(el);
+    transcriptList.scrollTop = transcriptList.scrollHeight;
+  }
+
+  // ------------------------------------------------------------------
+  // Bottom controls
+  // ------------------------------------------------------------------
+  muteBtn.addEventListener('click', async () => {
+    micMuted = !micMuted;
+    muteBtn.classList.toggle('off', micMuted);
+    if (livekitRoom) {
+      if (micMuted) {
+        await livekitRoom.localParticipant.setMicrophoneEnabled(false);
+      } else if (recordingRole) {
+        await livekitRoom.localParticipant.setMicrophoneEnabled(true);
+      }
+    }
+    updateTurnUI();
+  });
+  speakerBtn.addEventListener('click', () => {
+    speakerEnabled = !speakerEnabled;
+    if (agentAudioEl) agentAudioEl.muted = !speakerEnabled;
+    speakerBtn.classList.toggle('off', !speakerEnabled);
+  });
+  translationBtn.addEventListener('click', () => {
+    transcriptPanel.classList.toggle('hidden');
+    translationBtn.classList.toggle('on', !transcriptPanel.classList.contains('hidden'));
+  });
+  notesBtn.addEventListener('click', () => notesOverlay.classList.add('show'));
+  document.getElementById('notesCloseBtn').addEventListener('click', () => notesOverlay.classList.remove('show'));
+  document.getElementById('tipClose').addEventListener('click', () => tipBanner.classList.add('hidden'));
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // Builds the end-of-call clinical summary from data already collected
+  // during the call (symptomHistory/emergencyHistory accumulated in the
+  // DataReceived handler above, plus the live transcript panel's own DOM)
+  // -- no separate backend call needed, everything the doctor needs was
+  // already streamed to this page as the conversation happened.
+  function buildCallSummary() {
+    const severityRank = { low: 1, medium: 2, high: 3 };
+    const allSymptoms = new Set();
+    const durations = new Set();
+    let worstSeverity = null;
+    symptomHistory.forEach(entry => {
+      entry.symptoms.forEach(s => allSymptoms.add(s));
+      if (entry.duration) durations.add(entry.duration);
+      if (entry.severity && (!worstSeverity || (severityRank[entry.severity] || 0) > (severityRank[worstSeverity] || 0))) {
+        worstSeverity = entry.severity;
+      }
+    });
+
+    const sections = [];
+
+    // Prefer whatever the patient actually typed (more authoritative if
+    // both exist), fall back to whatever Gemma picked up from speech.
+    const finalName = patientNameInput.value.trim() || extractedPatientDetails.name || '';
+    sections.push(`
+      <div class="summary-section">
+        <h3>Patient</h3>
+        <div class="summary-row">${finalName ? escapeHtml(finalName) : 'Name not provided'}</div>
+        ${extractedPatientDetails.age ? `<div class="summary-row">Age: ${escapeHtml(extractedPatientDetails.age)}</div>` : ''}
+        ${extractedPatientDetails.gender ? `<div class="summary-row">Gender: ${escapeHtml(extractedPatientDetails.gender)}</div>` : ''}
+        <div class="summary-row">Call duration: ${callTimer.textContent}</div>
+      </div>
+    `);
+
+    if (emergencyHistory.length) {
+      sections.push(`
+        <div class="summary-section">
+          <h3>⚠ Emergency Flags</h3>
+          ${emergencyHistory.map(e => `<div class="summary-emergency">${escapeHtml(e.level)}: ${escapeHtml(e.reason)} — ${escapeHtml(e.action)}</div>`).join('')}
+        </div>
+      `);
+    }
+
+    if (allSymptoms.size) {
+      sections.push(`
+        <div class="summary-section">
+          <h3>Symptoms Reported</h3>
+          <div class="summary-chips">${[...allSymptoms].map(s => `<span class="chip">${escapeHtml(s)}</span>`).join('')}</div>
+          <div class="summary-row" style="margin-top:8px;">Duration: ${[...durations].join(', ') || 'not specified'} &middot; Severity: ${worstSeverity || 'not assessed'}</div>
+        </div>
+      `);
+    }
+
+    const transcriptEntries = Array.from(transcriptList.querySelectorAll('.transcript-entry')).map(el => {
+      const label = el.querySelector('.label')?.textContent || '';
+      const text = el.querySelector('.text')?.textContent || '';
+      return `<div class="summary-transcript-entry"><span class="who">${escapeHtml(label)}:</span> ${escapeHtml(text)}</div>`;
+    });
+    if (transcriptEntries.length) {
+      sections.push(`
+        <div class="summary-section">
+          <h3>Conversation Transcript</h3>
+          <div class="summary-transcript">${transcriptEntries.join('')}</div>
+        </div>
+      `);
+    }
+
+    return sections.join('');
+  }
+
+  async function endCall(reasonText) {
+    endedByUser = true;
+    if (livekitRoom) await livekitRoom.disconnect();
+    document.querySelector('.page').style.display = 'none';
+    endedReason.textContent = reasonText || 'Thank you for using MedVoice.';
+    const summaryHtml = buildCallSummary();
+    if (summaryHtml.trim()) {
+      summaryCard.innerHTML = summaryHtml;
+      summaryCard.classList.add('show');
+    }
+    endedScreen.style.display = 'flex';
+  }
+  endCallBtn.addEventListener('click', () => endCall());
+
+  const decoder = new TextDecoder();
+
+  async function connect() {
+    if (!LIVEKIT_URL) {
+      const configRes = await fetch(`${BACKEND_URL}/config`);
+      LIVEKIT_URL = (await configRes.json()).livekit_url;
+    }
+    const res = await fetch(`${BACKEND_URL}/token?room=${encodeURIComponent(room)}&identity=${kioskId}&role=kiosk`);
+    const { token } = await res.json();
+
+    livekitRoom = new LivekitClient.Room({ adaptiveStream: true, dynacast: true });
+
+    // Only attach the agent's synthesized-speech track ("medvoice-tts") —
+    // this participant should only ever hear the translated audio.
+    livekitRoom.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication) => {
+      if (track.kind !== 'audio' || publication.trackName !== 'medvoice-tts') return;
+      agentAudioEl = track.attach();
+      agentAudioEl.muted = !speakerEnabled;
+      agentAudioEl.volume = currentVolume;
+      document.body.appendChild(agentAudioEl);
+      setupOutputAnalyser(agentAudioEl);
+      agentAudioEl.addEventListener('error', () => {
+        showAudioDebug('⚠ Audio track failed to load (media error). Try refreshing the page.');
+      });
+      agentAudioEl.play().catch(err => {
+        showAudioDebug(`⚠ Browser blocked automatic audio playback (${err.name}). Tap anywhere on the page, then speak again.`);
+      });
+    });
+
+    livekitRoom.on(LivekitClient.RoomEvent.DataReceived, (payload, participant, kind, topic) => {
+      let data;
+      try { data = JSON.parse(decoder.decode(payload)); } catch (e) { return; }
+
+      if (topic === 'call-status') {
+        applyCallState(data.state, data.direction, data.message);
+      }
+      if (topic === 'doctor-transcript' || data.type === 'medical_translation') {
+        addTranscriptEntry('patient', `You (${LANG_LABEL[data.patient_language] || data.patient_language})`, data.original_transcript || '');
+        addTranscriptEntry('doctor', 'Doctor hears (English)', data.english_translation || '');
+      }
+      if (topic === 'patient-transcript' || data.type === 'doctor_reply') {
+        addTranscriptEntry('doctor', `Doctor (${LANG_LABEL[doctorLang] || doctorLang})`, data.original_transcript || '');
+        addTranscriptEntry('patient', `You hear (${LANG_LABEL[data.target_language] || data.target_language})`, data.translated_text || '');
+      }
+      if (topic === 'emergency-alert' || data.type === 'emergency_alert') {
+        emergencyReason.textContent = data.reason || 'immediate attention recommended';
+        emergencyBanner.classList.add('show');
+        emergencyHistory.push({ level: data.level || 'HIGH', reason: data.reason || '', action: data.action || '' });
+      }
+      if (topic === 'symptom-extraction' || data.type === 'symptom_extraction') {
+        const symptoms = Array.isArray(data.symptoms) ? data.symptoms : [];
+        if (symptoms.length) {
+          symptomHistory.push({ symptoms, duration: data.duration || '', severity: data.severity || 'low' });
+        }
+        symptomsLine.innerHTML = '';
+        if (symptoms.length) {
+          symptoms.forEach(s => {
+            const chip = document.createElement('span');
+            chip.className = 'chip';
+            chip.textContent = s;
+            symptomsLine.appendChild(chip);
+          });
+          const meta = document.createElement('span');
+          meta.className = 'meta';
+          meta.textContent = `${data.duration || 'unknown duration'} · ${data.severity || 'low'} severity`;
+          symptomsLine.appendChild(meta);
+          symptomsLine.classList.add('show');
+        } else {
+          symptomsLine.classList.remove('show');
+        }
+      }
+      if (topic === 'patient-details' || data.type === 'patient_details') {
+        // The patient can mention their name/age/gender in any utterance,
+        // not just the first one -- keep whichever value was last heard for
+        // each field rather than overwriting with blanks from a later
+        // utterance that didn't mention it.
+        if (data.name) {
+          extractedPatientDetails.name = data.name;
+          if (!patientNameInput.value.trim()) patientNameInput.value = data.name;
+        }
+        if (data.age) extractedPatientDetails.age = data.age;
+        if (data.gender) extractedPatientDetails.gender = data.gender;
+      }
+    });
+
+    livekitRoom.on(LivekitClient.RoomEvent.ConnectionQualityChanged, (quality, participant) => {
+      if (!livekitRoom.localParticipant || participant.sid !== livekitRoom.localParticipant.sid) return;
+      const q = String(quality).toLowerCase();
+      if (q.includes('excellent')) { qualityTitle.textContent = 'Excellent Connection'; qualityDetail.textContent = 'Network Stable'; }
+      else if (q.includes('good')) { qualityTitle.textContent = 'Good Connection'; qualityDetail.textContent = 'Network Stable'; }
+      else if (q.includes('poor')) { qualityTitle.textContent = 'Poor Connection'; qualityDetail.textContent = 'Network Unstable'; }
+      else { qualityTitle.textContent = 'Connection'; qualityDetail.textContent = '—'; }
+    });
+
+    livekitRoom.on(LivekitClient.RoomEvent.Disconnected, (reason) => {
+      if (endedByUser) return;
+      statusChip.className = 'status-chip error';
+      statusChipLabel.textContent = 'Disconnected';
+      endCall(reason ? `Call disconnected: ${reason}` : 'The call was disconnected.');
+    });
+
+    await livekitRoom.connect(LIVEKIT_URL, token);
+    statusChip.className = 'status-chip';
+    statusChipLabel.textContent = 'Live Consultation';
+    callStartedAt = Date.now();
+    applyCallState('idle');
+    startMicMeter();
+    tickWaveform();
+
+    // Announce both starting languages so the agent has them before anyone
+    // speaks.
+    livekitRoom.localParticipant.publishData(
+      new TextEncoder().encode(JSON.stringify({ language: patientLang })),
+      { reliable: true, topic: 'patient-language' }
+    );
+    livekitRoom.localParticipant.publishData(
+      new TextEncoder().encode(JSON.stringify({ language: doctorLang })),
+      { reliable: true, topic: 'doctor-reply-language' }
+    );
+
+    // Live, hands-free: start listening as the patient immediately, no tap
+    // required to begin the conversation.
+    await switchToRole('patient');
+  }
+
+  connect();
+</script>
+</body>
+</html>

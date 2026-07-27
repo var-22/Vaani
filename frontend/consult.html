@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MedVoice — Consultation</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f2f4f2; color: #10241f; font-family: Inter, system-ui, sans-serif; }
+    header { min-height: 70px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 10px 24px; background: #fff; border-bottom: 1px solid #d8ded9; }
+    h1 { margin: 0; font: 600 21px Georgia, serif; color: #0b3d3a; }
+    .controls { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+    .room { color: #5b6b65; font: 13px ui-monospace, monospace; }
+    input { width: 118px; border: 1px solid #c7d0cb; border-radius: 8px; padding: 8px 10px; color: #10241f; }
+    button { border: 1px solid #c7d0cb; border-radius: 8px; background: #fff; color: #0b3d3a; padding: 8px 11px; font-weight: 650; cursor: pointer; }
+    button:hover { background: #e8f1ed; }
+    .primary { background: #0b3d3a; color: #fff; border-color: #0b3d3a; }
+    .primary:hover { background: #14544f; }
+    .live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #4d6259; }
+    .live::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #2e7d6b; box-shadow: 0 0 0 4px #dceae5; }
+    .panels { height: calc(100vh - 70px); display: grid; grid-template-columns: minmax(340px, 42%) 1fr; }
+    section { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+    section + section { border-left: 1px solid #d8ded9; }
+    h2 { margin: 0; padding: 11px 20px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #5b6b65; background: #fff; border-bottom: 1px solid #d8ded9; }
+    iframe { flex: 1; width: 100%; border: 0; background: #f2f4f2; }
+    .panels.patient-focus { grid-template-columns: 1fr 0; }
+    .panels.doctor-focus { grid-template-columns: 0 1fr; }
+    .panels.patient-focus section:last-child, .panels.doctor-focus section:first-child { overflow: hidden; visibility: hidden; }
+    @media (max-width: 760px) {
+      header { padding: 0 16px; }
+      .panels { height: auto; min-height: calc(100vh - 70px); grid-template-columns: 1fr; grid-template-rows: 80vh 100vh; }
+      .panels.patient-focus, .panels.doctor-focus { grid-template-columns: 1fr; grid-template-rows: 100vh; }
+      section + section { border-left: 0; border-top: 1px solid #d8ded9; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>MedVoice Consultation</h1>
+    <div class="controls">
+      <span class="live">Session ready</span>
+      <input id="roomInput" aria-label="Room name" />
+      <button id="changeRoomBtn">Change room</button>
+      <button class="primary" id="startBtn">Start patient call</button>
+      <button id="patientFocusBtn">Patient</button>
+      <button id="doctorFocusBtn">Doctor</button>
+      <button id="bothBtn">Split view</button>
+    </div>
+  </header>
+  <div class="panels">
+    <section>
+      <h2>Patient</h2>
+      <iframe id="patientFrame" title="Patient interface" allow="microphone; autoplay"></iframe>
+    </section>
+    <section>
+      <h2>Doctor console</h2>
+      <iframe id="doctorFrame" title="Doctor console" allow="autoplay"></iframe>
+    </section>
+  </div>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const room = params.get('room') || 'consult-1';
+    const query = new URLSearchParams({ room }).toString();
+    document.getElementById('roomInput').value = room;
+    document.getElementById('patientFrame').src = `patient.html?${query}`;
+    document.getElementById('doctorFrame').src = `doctor.html?${query}`;
+
+    const panels = document.querySelector('.panels');
+    document.getElementById('patientFocusBtn').onclick = () => panels.className = 'panels patient-focus';
+    document.getElementById('doctorFocusBtn').onclick = () => panels.className = 'panels doctor-focus';
+    document.getElementById('bothBtn').onclick = () => panels.className = 'panels';
+    document.getElementById('changeRoomBtn').onclick = () => {
+      const nextRoom = document.getElementById('roomInput').value.trim();
+      if (nextRoom) location.search = new URLSearchParams({ room: nextRoom }).toString();
+    };
+    document.getElementById('startBtn').onclick = () => {
+      const frame = document.getElementById('patientFrame');
+      const joinButton = frame.contentDocument && frame.contentDocument.getElementById('joinBtn');
+      if (joinButton) joinButton.click();
+    };
+  </script>
+</body>
+</html>
