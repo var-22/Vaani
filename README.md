@@ -9,6 +9,8 @@ within roughly 1–2 seconds, and Gemma 4 simultaneously extracts structured
 clinical signal — symptoms, duration, severity, and emergency risk — so nothing
 important gets lost to a language barrier.
 
+ 
+
 ---
 
 ## 1. Problem Statement
@@ -142,27 +144,9 @@ needs:
 
 ## 4. How It Works
 
-```
- PATIENT (ta-IN / te-IN / en-IN)                         DOCTOR (en-IN / ta-IN / te-IN)
-        │  speaks                                              │  speaks
-        ▼                                                      ▼
- ┌───────────────────────── LiveKit real-time audio room ─────────────────────────┐
- │                                                                                  │
- │   Silero VAD  ──detects start/end of speech──▶  Sarvam Saaras v3 STT (stream)   │
- │                                                        │ transcript              │
- │                                                        ▼                        │
- │                              Gemma 4  (Google AI Studio, streamed)              │
- │                              — translates the utterance, token-by-token —       │
- │                                    │                              │             │
- │                        spoken reply (streamed)          background:            │
- │                                    ▼                    extract_symptoms() +    │
- │                    Sarvam Bulbul v3 TTS (stream)         detect_emergency()     │
- │                       → LiveKit audio track                     │              │
- │                                                                  ▼              │
- │                                                     doctor-facing dashboard:    │
- │                                                     symptom chips + emergency   │
- │                                                     alert (level/reason/action) │
- └──────────────────────────────────────────────────────────────────────────────┘
+<img width="1024" height="559" alt="image" src="https://github.com/user-attachments/assets/dd9005ff-c07f-4adc-88c4-07557a1c5a18" />
+
+
 ```
 
 Everything is **streamed**, not batched: speech-to-text starts transcribing
