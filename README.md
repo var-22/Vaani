@@ -149,7 +149,7 @@ needs:
 
 ```
 
-Everything is **streamed**, not batched: speech-to-text starts transcribing
+## Everything is **streamed**, not batched: speech-to-text starts transcribing
 while the person is still talking (not after they finish), Gemma's
 translation is generated and spoken incrementally, and the clinical
 tool-calling analysis (which is slower — a full reasoning round-trip) runs
