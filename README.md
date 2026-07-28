@@ -9,7 +9,7 @@ within roughly 1–2 seconds, and Gemma 4 simultaneously extracts structured
 clinical signal — symptoms, duration, severity, and emergency risk — so nothing
 important gets lost to a language barrier.
 
-## 🏆 Hackathon Track
+##  Hackathon Track
 
 **Selected Track:** Track 1 — "Vaani" — Voice-First Translation for Bharat
 
@@ -186,27 +186,27 @@ translated reply.
 
 ## 5. Key Features
 
-- 🎙️ **Hands-free live listening** — no "tap to talk" button; the mic is
+-  **Hands-free live listening** — no "tap to talk" button; the mic is
   always on, VAD segments utterances automatically.
-- 🌐 **3 languages, either side** — Tamil / Telugu / English, independently
+-  **3 languages, either side** — Tamil / Telugu / English, independently
   selectable for patient and doctor, switchable mid-call.
-- ⚡ **~1–2 second round trip** — streaming STT → streaming Gemma
+-  **~1–2 second round trip** — streaming STT → streaming Gemma
   translation → streaming TTS, all pipelined rather than run as three
   sequential blocking calls.
-- 📝 **Live bilingual transcript** — every utterance appears as text in both
+-  **Live bilingual transcript** — every utterance appears as text in both
   languages, alongside the spoken translation.
-- 🩺 **AI symptom extraction** — Gemma 4 tool-calling pulls out symptoms,
+-  **AI symptom extraction** — Gemma 4 tool-calling pulls out symptoms,
   duration, and a severity read from natural conversation, shown live as
   chips on the doctor's side.
-- 🚨 **AI emergency detection** — a second Gemma 4 tool call screens for
+-  **AI emergency detection** — a second Gemma 4 tool call screens for
   chest pain, breathing difficulty, severe bleeding, stroke symptoms, and
   severe allergic reaction, backed by a deterministic keyword fail-safe;
   triggers a red alert banner with the reasoning shown.
-- 🔒 **No raw cross-language audio leak** — only the synthesized, translated
+-  **No raw cross-language audio leak** — only the synthesized, translated
   track is played back; the room never exposes one party's raw mic audio to
   the other untranslated.
 
-## ⚠️ Medical Disclaimer
+##  Medical Disclaimer
 
 MedVoice is an assistive communication and clinical information extraction
 system designed to reduce language barriers during doctor–patient
