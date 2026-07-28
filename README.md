@@ -125,48 +125,59 @@ speech-to-text goes through it. Concretely, Gemma 4 is used for:
    (`route_doctor`) and can book an appointment (`book_appointment`),
    available as a deeper analysis path beyond the live-call fast path.
 
-### Why the hosted API instead of running the open-weights model directly
+## Why We Use Google AI Studio API as the Default Gemma Deployment
 
-`GEMMA_BACKEND=ollama` is fully implemented and works (see `gemma_brain.py`'s
-`_call_ollama`) — this isn't a case of the open-weights model being
-unavailable to us. Google AI Studio's API is the *default* deployment choice
-for this project specifically because of what a real-time voice pipeline
-needs:
+MedVoice supports multiple deployment options for the Gemma model. The local Gemma integration through Ollama (`GEMMA_BACKEND=ollama`) is already implemented and works correctly. However, Google AI Studio is selected as the default deployment option because MedVoice is a real-time voice communication system, where the complete pipeline depends on multiple services working together.
 
-- **Token-level streaming is load-bearing, not a nice-to-have.** The whole
-  "spoken reply starts before the sentence finishes generating" latency
-  design depends on `streamGenerateContent`'s SSE token stream. The local
-  Ollama path in this codebase currently calls Gemma non-streamed
-  (`stream: false`), so it works as a correctness fallback but doesn't get
-  the streaming latency benefit — getting equivalent low-latency streaming
-  out of a self-hosted model is real additional engineering, not a config
-  flag.
-- **Consistent inference speed regardless of reviewer hardware.** A 26B-parameter
-  model run locally is only as fast as the GPU it's on; a hackathon judge
-  running this on a laptop with no GPU (or a weaker one than ours) would see
-  wildly different — likely unusable — latency for a "real-time" demo. The
-  hosted API gives the same response time for everyone who runs this
-  repository, which matters for a project whose entire pitch is speed.
-- **Reproducibility for judges without a multi-GB download or GPU
-  requirement.** Setup is `pip install -r requirements.txt` plus a free
-  Google AI Studio API key — no pulling model weights, no VRAM requirements,
-  no quantization choices that could silently change output quality. This
-  also matches the competition's own guidance that commercial auxiliary APIs
-  are fine as long as they're reasonably and publicly accessible, which
-  Google AI Studio's free tier is.
-- **No quantization-quality variance for a medical-accuracy-sensitive task.**
-  Locally-run open-weight models are typically served quantized (4-bit/8-bit)
-  to fit consumer hardware, which can measurably affect translation fidelity
-  and tool-call JSON reliability. Since MedVoice's entire value proposition
-  is *not* losing or garbling clinical meaning in translation, we default to
-  the un-quantized, provider-hosted model rather than trade accuracy for
-  local-inference convenience.
-- **It's a default, not a lock-in.** Because of the provider-agnostic
-  tool-calling protocol (point 3 above), switching to fully local, offline
-  inference is a one-line env var change (`GEMMA_BACKEND=ollama`) for anyone
-  who needs on-prem/offline deployment (e.g. a rural clinic with no reliable
-  internet) — see Section 9's Vision for how this fits the production
-  scaling story.
+### 1. Real-time streaming performance
+
+In a voice-based healthcare assistant, reducing response delay is critical. Users should be able to hear the translated response as quickly as possible instead of waiting for the complete response generation.
+
+Google AI Studio provides token-level streaming through `streamGenerateContent`, allowing the system to start processing responses while the model is still generating output.
+
+The local Ollama integration provides a reliable alternative for running Gemma inference, but achieving the same low-latency streaming experience requires additional optimization and infrastructure work.
+
+### 2. Consistent performance across different environments
+
+The performance of locally deployed models depends heavily on the available hardware. A large model running on a powerful GPU can perform well, while the same setup on a regular laptop may introduce significant delays.
+
+Since MedVoice focuses on real-time medical conversations, consistent response time is important. Using a hosted inference service provides predictable performance across different systems without requiring users to configure GPUs or optimize model deployment.
+
+### 3. Simple setup and better reproducibility
+
+Using Google AI Studio makes the project easier to test and demonstrate:
+
+- Install project dependencies
+- Configure the API key
+- Run the application
+
+Users do not need to:
+- Download large model files
+- Configure GPU environments
+- Manage memory requirements
+- Handle model optimization settings
+
+This allows reviewers and developers to quickly evaluate the complete MedVoice experience.
+
+### 4. Maintaining accuracy for medical translation
+
+Medical conversations require high accuracy because incorrect translations can affect symptoms, instructions, and clinical decisions.
+
+Running models locally often requires optimization techniques such as quantization to reduce hardware requirements. While useful, these changes can sometimes impact output quality.
+
+For MedVoice, maintaining translation reliability and consistent model behavior is more important than reducing infrastructure requirements.
+
+### 5. Flexible architecture for future deployment
+
+The system is designed with flexibility in mind. The LLM layer can be switched between hosted and local inference depending on deployment requirements.
+
+However, MedVoice is a complete real-time voice pipeline that includes components such as LiveKit, speech recognition, translation processing, and text-to-speech. Changing only the LLM backend does not make the entire application offline.
+
+For environments that require fully offline operation, each component of the voice pipeline would need suitable local alternatives, including communication infrastructure, speech-to-text, and text-to-speech systems.
+
+This approach allows MedVoice to support:
+- Reliable cloud-based deployment for real-time usage and demonstrations
+- Future customized deployments where offline or private infrastructure is required
 
 ## 4. How It Works
 
