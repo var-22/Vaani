@@ -33,11 +33,13 @@ understanding and generation model.
 pipelines.
 
 
-## 🎥 Demo Video
+## 🎥 Demo Videos
 
-[▶️ Watch MedVoice Demo Video](https://drive.google.com/file/d/1OnBXChKZxUioGwGQ9ZDlQfJ8MDrX72Bv/view?usp=sharing)
+### 🗣️ Tamil Translator Demo
+[▶️ Watch Tamil Translator Demo Video](https://drive.google.com/file/d/1OnBXChKZxUioGwGQ9ZDlQfJ8MDrX72Bv/view?usp=sharing)
 
----
+### 🗣️ Telugu Translator Demo
+[▶️ Watch Telugu Translator Demo Video](https://drive.google.com/file/d/1b9Zq79EI6ziiIlnLkNgw8ZT9mKxla5Ex/view?usp=sharing)
 
 ## 1. Problem Statement
 
