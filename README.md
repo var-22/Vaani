@@ -408,31 +408,3 @@ code problem:
   extend, so a regression in one new language surfaces before it reaches a
   real patient.
 
-## 10. Kaggle Competition Compliance
-
-- **License**: This repository is licensed under the [MIT License](LICENSE),
-  an OSI-approved open-source license, satisfying the competition's Winner
-  License requirement (non-commercial deployment and study of the code is
-  unrestricted).
-- **External APIs used**: LiveKit Cloud, Sarvam AI, and Google AI Studio
-  (Gemma 4) are all publicly accessible developer APIs with free/low-cost
-  tiers, in line with the competition's Reasonableness Standard for
-  auxiliary tooling. No proprietary or restricted datasets are used.
-- **Gemma 4 integration is directly reviewable**: see Section 3 above and
-  `gemma_brain.py` for the exact prompts, tool schemas, and streaming call
-  sites.
-- **Repository & demo links**: _add your public GitHub repository URL and
-  live demo link here before submitting your Kaggle Writeup._
-
-## 11. Known Limitations / Roadmap
-
-- No persistent patient identity or end-of-call clinical summary yet (in
-  progress) — currently each utterance is processed independently rather
-  than aggregated into a single case record for the doctor.
-- `healthcare_tools.py`'s doctor directory and appointment booking are
-  in-memory stubs, not a real scheduling system.
-- No authentication/consent flow — not yet suitable for real patient data
-  without adding that layer.
-- Only Tamil, Telugu, and English are wired up end-to-end today; Sarvam
-  supports additional Indian languages that could be added via
-  `config.SUPPORTED_PATIENT_LANGUAGES`.
