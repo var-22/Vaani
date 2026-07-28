@@ -157,7 +157,7 @@ Users do not need to:
 - Manage memory requirements
 - Handle model optimization settings
 
-This allows reviewers and developers to quickly evaluate the complete MedVoice experience.
+
 
 ### 4. Maintaining accuracy for medical translation
 
